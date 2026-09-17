@@ -15,9 +15,17 @@ st.set_page_config(
 def load_data():
     df = pd.read_csv('pop_data.csv')
     num_cols = [c for c in df.columns if c != '연도']
+    
+    # 연도 열 정수형 변환
+    df['연도'] = pd.to_numeric(df['연도'], errors='coerce').astype(int)
+    
+    # 모든 숫자 데이터 열의 쉼표(,) 및 공백 제거 후 정수형(int)으로 강제 변환
     for col in num_cols:
-        if df[col].dtype == object:
-            df[col] = df[col].str.replace(',', '').astype(int)
+        df[col] = pd.to_numeric(
+            df[col].astype(str).str.replace(',', '').str.strip(), 
+            errors='coerce'
+        ).fillna(0).astype(int)
+        
     return df, num_cols
 
 df, num_cols = load_data()
@@ -67,7 +75,7 @@ for col in selected_categories:
         hovertemplate='%{y:,.0f} 만 명'
     ))
 
-# X축 / Y축 설정
+# X축 / Y축 및 연한 실선 스냅 설정
 fig.update_layout(
     hovermode='x unified',
     hoverlabel=dict(
@@ -139,12 +147,12 @@ st.markdown(f"#### 📌 **{selected_year}년** 주요 인구 지표 요약 (단�
 cols = st.columns(len(num_cols))
 
 for idx, col in enumerate(num_cols):
-    val_curr = row_curr[col]
+    val_curr = int(row_curr[col])
     
     if row_prev is not None:
-        val_prev = row_prev[col]
+        val_prev = int(row_prev[col])
         diff = val_curr - val_prev
-        diff_pct = (diff / val_prev) * 100
+        diff_pct = (diff / val_prev * 100) if val_prev != 0 else 0
         delta_str = f"{diff:+,d} 만 명 ({diff_pct:+.1f}%)"
     else:
         delta_str = "기준 연도"
@@ -166,7 +174,7 @@ with col_left:
     age_cols = [c for c in num_cols if c != '총인구']
     pie_data = pd.DataFrame({
         '연령대': age_cols,
-        '인구수': [row_curr[c] for c in age_cols]
+        '인구수': [int(row_curr[c]) for c in age_cols]
     })
     
     fig_pie = px.pie(
@@ -183,12 +191,12 @@ with col_left:
 
 with col_right:
     st.markdown(f"##### 📋 {selected_year}년 상세 세부 데이터표")
-    total_pop = row_curr['총인구'] if '총인구' in row_curr else sum([row_curr[c] for c in age_cols])
+    total_pop = int(row_curr['총인구']) if '총인구' in row_curr else sum([int(row_curr[c]) for c in age_cols])
     
     details = []
     for c in age_cols:
-        pop = row_curr[c]
-        share = (pop / total_pop) * 100
+        pop = int(row_curr[c])
+        share = (pop / total_pop * 100) if total_pop != 0 else 0
         details.append({
             '연령대 그룹': c,
             '인구 수': f"{pop:,} 만 명",
@@ -198,7 +206,7 @@ with col_right:
     if '총인구' in num_cols:
         details.append({
             '연령대 그룹': '총인구',
-            '인구 수': f"{row_curr['총인구']:,} 만 명",
+            '인구 수': f"{int(row_curr['총인구']):,} 만 명",
             '전체 대비 비중': '100.0%'
         })
 
